@@ -5,10 +5,17 @@
 #include <vector>
 #include <list>
 
-std::string ev( const std::vector<std::string>& cur_cmd )
+enum {
+	mi_ev_ok = 0,
+	mi_ev_no_func,
+	mi_ev_return,	// special case: return from function
+	mi_ev_do,	// special case: eval one of the args
+};
+
+int ev( const std::vector<std::string>& cur_cmd, std::string *res, int *do_arg )
 {
 	int i = 0;
-	std::string ret = "<ret of";
+	std::string ret = "<res of (";
 	for (auto x : cur_cmd)
 	{
 		printf( "%s %d: \"%s\"\n", i == 0 ? "eval: " : "      " , i, x.c_str() );
@@ -16,8 +23,10 @@ std::string ev( const std::vector<std::string>& cur_cmd )
 		ret += " ";
 		ret += x;
 	}
-	ret += ">";
-	return ret;
+	ret += ")>";
+	if (res) *res = ret;
+	if (do_arg) *do_arg = 0;
+	return mi_ev_ok;
 }
 
 
@@ -51,6 +60,8 @@ void mi( const std::string& e )
 	int state = mis_normal;
 	std::list<int> state_stack;
 
+	std::string side_effect;
+
 	std::string cur_str;
 	str_list_t cur_cmd;
 	str_list_stack_t cmd_stack;
@@ -62,6 +73,8 @@ void mi( const std::string& e )
 	{
 		int ch = ii < e.size() ? e[ii] : -1;
 		ii++;
+
+		//printf( "state: %d, char %c (%d)\n", state, isprint(ch) ? ch : '.', ch );
 
 		if (state == mis_normal)
 		{
@@ -75,7 +88,12 @@ void mi( const std::string& e )
 				}
 				if (not cur_cmd.empty())
 				{
-					std::string res = ev( cur_cmd );
+					std::string res;
+					int ret;
+					int do_arg = 0;
+					ret = ev( cur_cmd, &res, &do_arg );
+					// if (ret == )
+
 					cur_cmd.clear();
 
 					if (not(cmd_stack.empty()) and not(brace_stack.empty()) and brace_stack.back() == ch )
@@ -89,7 +107,8 @@ void mi( const std::string& e )
 					}
 					else
 					{
-						cur_str = res;
+						//cur_str = res;
+						side_effect = res;
 					}
 				}
 			}
@@ -145,8 +164,15 @@ void mi( const std::string& e )
 		{
 			if (ch == '"')
 			{
-				cur_cmd.push_back( cur_str );
-				cur_str.clear();
+				if (sbrace_stack.empty())
+				{
+					cur_cmd.push_back( cur_str );
+					cur_str.clear();
+				}
+				else
+				{
+					cur_str.push_back( ch );
+				}
 
 				state = state_stack.back();
 				state_stack.pop_back();
@@ -187,6 +213,8 @@ void mi( const std::string& e )
 			}
 			else if (ch == '"')
 			{
+				cur_str.push_back( ch );
+
 				state_stack.push_back( state );
 				state = mis_string;
 			}
@@ -211,9 +239,23 @@ void mi( const std::string& e )
 
 void test1()
 {
+	const char *x = 
+		"switch (a 1 2) {\n"
+		"case \"a\" { print $a }\n"
+		"case \"b\" { print $b }\n"
+		"case \"c\" { print $c }\n"
+		"}\n"
+		;
+	printf( "raw: [[[\n%s]]]\n", x );
+	mi( std::string( x ) );
+	printf( "-------------------------------\n" );
 	mi( std::string("let a \"string test\"") );
+	printf( "-------------------------------\n" );
 	mi( std::string("let a (mul 2 2) (mul 3 (add 1 1))") );
+	printf( "-------------------------------\n" );
 	mi( std::string("if $a {curly test {test} test} else { not wrong too }") );
+	printf( "-------------------------------\n" );
+
 }
 
 int main()
