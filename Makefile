@@ -1,5 +1,6 @@
 
-CXXFLAGS=-std=c++11 -Wall
+CXX=clang++
+CXXFLAGS=-std=c++11 -Wall -O -g
 
 all: min
 

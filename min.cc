@@ -4,15 +4,78 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <map>
 
 enum {
 	mi_ev_ok = 0,
+	mi_ev_error,
 	mi_ev_no_func,
 	mi_ev_return,	// special case: return from function
 	mi_ev_do,	// special case: eval one of the args
 };
 
-int ev( const std::vector<std::string>& cur_cmd, std::string *res, int *do_arg )
+struct mi_uproc {
+	std::string name;
+	std::string body;
+	std::list< std::pair<std::string, std::string> > args;
+};
+
+struct mirtc {
+	std::map< std::string, mi_uproc > proc_table;
+	std::map< std::string, std::string > var_table;
+};
+
+
+// let a b
+int micm_let( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *res )
+{
+	if (cur_cmd.size() >= 2)
+	{
+		std::string v;
+		bool first = true;
+		for (unsigned i = 2; i < cur_cmd.size(); i++)
+		{
+			if (!first)
+			{
+				v += " ";
+				first = false;
+			}
+			v += cur_cmd[i];
+		}
+		rtc->var_table[ cur_cmd[1] ] = v;
+	}
+	else
+	{
+		return mi_ev_error;
+	}
+	return mi_ev_ok;
+}
+
+// proc hello name {print "hello"; print name; print "\n"}
+int micm_proc( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *res )
+{
+	mi_uproc proc;
+	if (cur_cmd.size() >= 3)
+	{
+		proc.name = cur_cmd[1];
+		proc.body = cur_cmd.back();
+		for (unsigned i = 2; i<cur_cmd.size()-1; i++)
+		{
+			proc.args.push_back( std::make_pair(cur_cmd[i], std::string()) );
+		}
+
+		rtc->proc_table[ proc.name ] = proc;
+	}
+	else
+	{
+		return mi_ev_error;
+	}
+	return mi_ev_ok;
+}
+
+int mi_call_uproc( const std::vector<std::string>& cur_cmd, std::string *res );
+
+int ev( const std::vector<std::string>& cur_cmd, std::string *res )
 {
 	int i = 0;
 	std::string ret = "<res of (";
@@ -25,7 +88,6 @@ int ev( const std::vector<std::string>& cur_cmd, std::string *res, int *do_arg )
 	}
 	ret += ")>";
 	if (res) *res = ret;
-	if (do_arg) *do_arg = 0;
 	return mi_ev_ok;
 }
 
@@ -53,7 +115,7 @@ static char decode_esc_char( char ch )
 	}
 }
 
-void mi( const std::string& e )
+void mi( mirtc *parent_rtc, const std::string& e )
 {
 	size_t ii = 0;
 
@@ -90,8 +152,7 @@ void mi( const std::string& e )
 				{
 					std::string res;
 					int ret;
-					int do_arg = 0;
-					ret = ev( cur_cmd, &res, &do_arg );
+					ret = ev( cur_cmd, &res );
 					// if (ret == )
 
 					cur_cmd.clear();
@@ -247,13 +308,13 @@ void test1()
 		"}\n"
 		;
 	printf( "raw: [[[\n%s]]]\n", x );
-	mi( std::string( x ) );
+	mi( NULL, std::string( x ) );
 	printf( "-------------------------------\n" );
-	mi( std::string("let a \"string test\"") );
+	mi( NULL, std::string("let a \"string test\"") );
 	printf( "-------------------------------\n" );
-	mi( std::string("let a (mul 2 2) (mul 3 (add 1 1))") );
+	mi( NULL, std::string("let a (mul 2 2) (mul 3 (add 1 1))") );
 	printf( "-------------------------------\n" );
-	mi( std::string("if $a {curly test {test} test} else { not wrong too }") );
+	mi( NULL, std::string("if $a {curly test {test} test} else { not wrong too }") );
 	printf( "-------------------------------\n" );
 
 }
