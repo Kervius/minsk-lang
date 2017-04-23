@@ -54,6 +54,7 @@ typedef int (*mi_command_t)( mirtc *rtc, const std::vector<std::string>& cur_cmd
 
 mirtc *mi_find_var_rtc( mirtc *rtc, const std::string& var_name, std::string **ppval )
 {
+	//mirtc *srtc = rtc;
 	while (rtc) {
 		auto x = rtc->var_table.find( var_name );
 		if (x != rtc->var_table.end()) {
@@ -62,11 +63,13 @@ mirtc *mi_find_var_rtc( mirtc *rtc, const std::string& var_name, std::string **p
 		}
 		rtc = rtc->parent_rtc;
 	}
+	//printf( "WRN: no var [%s] in rtc %p\n", var_name.c_str(), srtc );
 	return NULL;
 }
 
 mirtc *mi_find_proc_rtc( mirtc *rtc, const std::string& proc_name, mi_uproc **ppuproc )
 {
+	//mirtc *srtc = rtc;
 	while (rtc) {
 		auto x = rtc->proc_table.find( proc_name );
 		if (x != rtc->proc_table.end()) {
@@ -75,6 +78,7 @@ mirtc *mi_find_proc_rtc( mirtc *rtc, const std::string& proc_name, mi_uproc **pp
 		}
 		rtc = rtc->parent_rtc;
 	}
+	//printf( "ERR: no proc [%s] in rtc %p\n", proc_name.c_str(), srtc );
 	return NULL;
 }
 
@@ -227,7 +231,7 @@ int micm_add( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *
 
 		snprintf( buf1, sizeof(buf1), "%ld", ret );
 
-		printf( "DBG: add ==> %s\n", buf1 );
+		//printf( "DBG: add ==> %s\n", buf1 );
 
 		if (res) *res = std::string( buf1 );
 	}
@@ -252,7 +256,7 @@ int micm_mul( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *
 
 		snprintf( buf1, sizeof(buf1), "%ld", ret );
 
-		printf( "DBG: mul ==> %s\n", buf1 );
+		//printf( "DBG: mul ==> %s\n", buf1 );
 
 		if (res) *res = std::string( buf1 );
 	}
@@ -332,17 +336,16 @@ int mi_call_uproc( mirtc *parent_rtc, const std::vector<std::string>& cur_cmd, s
 
 	rtc.parent_rtc = parent_rtc;
 
-	// set args into variables
-
-	// call the mi() on the proc body
-
 	mi_uproc *puproc = NULL;
 	mirtc *prtc = mi_find_proc_rtc( parent_rtc, cur_cmd[0], &puproc );
-	if (prtc) {
+	if (prtc)
+	{
 		unsigned i = 1;
-		for (auto I : puproc->args ) {
+		for (auto I : puproc->args )
+		{
 			if (i >= cur_cmd.size())
 				break;
+
 			printf( "call_proc [%s]: local var: [%s] = [%s]\n",
 					cur_cmd[0].c_str(), I.first.c_str(), cur_cmd[i].c_str() );
 
@@ -353,10 +356,18 @@ int mi_call_uproc( mirtc *parent_rtc, const std::vector<std::string>& cur_cmd, s
 			micm_var( &rtc, var_cmd, NULL );
 			i++;
 		}
+
+		printf( "XXX: puSh rtc %p <- %p\n", &rtc, parent_rtc );
+
 		mi( &rtc, puproc->body );
+
+		printf( "XXX: pOp  rtc %p -> %p\n", &rtc, parent_rtc );
+
+		parent_rtc->side_effect = rtc.side_effect;
 		if (res) *res = rtc.side_effect;
 	}
-	else {
+	else
+	{
 		return mi_ev_no_proc;
 	}
 
@@ -375,7 +386,7 @@ int mi_call( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *r
 #endif
 
 	int ret = mi_call_uproc( rtc, cur_cmd, res );
-	
+
 	if (ret == mi_ev_no_proc)
 	{
 		for (auto x : micm_builtin_table)
@@ -386,8 +397,12 @@ int mi_call( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *r
 			}
 		}
 	}
+	else
+	{
+		return ret;
+	}
 
-	printf( "ERR: unk proc: [%s]\n", cur_cmd[0].c_str() );
+	printf( "ERR: unk proc: [%s] (rtc == %p)\n", cur_cmd[0].c_str(), rtc );
 
 	assert( false );
 
@@ -411,12 +426,11 @@ void mi( mirtc *parent_rtc, const std::string& e )
 {
 	size_t ii = 0;
 
-	mirtc rtc;
+	//mirtc rtc;;
+	mirtc &rtc = *(new mirtc);
 
 	int state = mis_normal;
 	std::list<int> state_stack;
-
-	std::string side_effect;
 
 	std::string cur_str;
 	str_list_t cur_cmd;
@@ -426,6 +440,8 @@ void mi( mirtc *parent_rtc, const std::string& e )
 	std::list<char> sbrace_stack;
 
 	rtc.parent_rtc = parent_rtc;
+
+	printf( "XXX: push rtc %p <- %p\n", &rtc, parent_rtc );
 
 	while (ii <= e.size())
 	{
@@ -454,7 +470,7 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					{
 						parent_rtc->side_effect = mi_val_join( cur_cmd, 1 );
 						printf( "DBG: return %s\n", parent_rtc->side_effect.c_str() );
-						return;
+						break;
 					}
 
 					ret = mi_call( &rtc, cur_cmd, &res );
@@ -474,7 +490,7 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					else
 					{
 						//cur_str = res;
-						side_effect = res;
+						rtc.side_effect = res;
 					}
 				}
 			}
@@ -616,13 +632,6 @@ void mi( mirtc *parent_rtc, const std::string& e )
 			else
 			{
 				std::string val;
-				/*
-				auto x = rtc.var_table.find( cur_str );
-				if (x != rtc.var_table.end())
-				{
-					val = x->second;
-				}
-				*/
 
 				std::string *pval = NULL;
 				mirtc *vrtc;
@@ -637,6 +646,8 @@ void mi( mirtc *parent_rtc, const std::string& e )
 				
 				state = state_stack.back();
 				state_stack.pop_back();
+
+				ii--;
 			}
 		}
 		else
@@ -645,6 +656,8 @@ void mi( mirtc *parent_rtc, const std::string& e )
 			assert( false && "bad state" );
 		}
 	}
+
+	printf( "XXX: pop  rtc %p -> %p\n", &rtc, parent_rtc );
 }
 
 void test1()
@@ -669,6 +682,11 @@ void test1()
 	mi( NULL, std::string("proc fact n { let a (fact (add n )) }") );
 	printf( "-------------------------------\n" );
 	*/
+
+	const char *x11 = "proc a { return (b) }; proc b { return (add 1 1) }; println (a);";
+	mi( NULL, std::string( x11 ) );
+
+	/*
 	const char *x2 =
 		"proc fact n {"					"\n"
 		"	if (eq $n 0) {"				"\n"
@@ -678,10 +696,13 @@ void test1()
 		"		return (mul $n $m)"		"\n"
 		"	}"					"\n"
 		"}"						"\n"
-		"print (fact 5)"				"\n"
+		"println (fact 5)"				"\n"
+		"println (mul 2 2)"				"\n"
 		;
 	printf( "raw: [[[\n%s]]]\n", x2 );
 	mi( NULL, std::string( x2 ) );
+	*/
+
 
 }
 
