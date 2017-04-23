@@ -6,3 +6,7 @@ all: min
 
 t: min
 	./min
+
+
+tags:
+	ctags min.cc
