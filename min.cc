@@ -33,6 +33,8 @@ struct mi_uproc {
 };
 
 struct mirtc {
+	int level;
+
 	mirtc *parent_rtc;
 
 	typedef std::map< std::string, mi_uproc > proc_table_t;
@@ -51,6 +53,14 @@ void mi( mirtc *parent_rtc, const std::string& e );
 typedef int (*mi_command_t)( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *res );
 
 
+#if 0
+#define PPR( rtc, fmt, ... )	\
+	do { printf( "(rtc %d) " fmt, (rtc)->level , ##__VA_ARGS__  ); } while(0)
+#else
+#define PPR( ... )	do { } while(0)
+#endif
+
+#define PP( ... )	PPR( rtc, __VA_ARGS__ )
 
 mirtc *mi_find_var_rtc( mirtc *rtc, const std::string& var_name, std::string **ppval )
 {
@@ -134,7 +144,7 @@ int micm_var( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *
 		rtc->var_table[ cur_cmd[1] ] = v;
 		rtc->side_effect = v;
 		if (res) *res = v;
-		printf( "DBG: create var: [%s], value [%s]\n", cur_cmd[1].c_str(), v.c_str() );
+		PP( "DBG: create var: [%s], value [%s]\n", cur_cmd[1].c_str(), v.c_str() );
 	}
 	else
 	{
@@ -231,7 +241,7 @@ int micm_add( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *
 
 		snprintf( buf1, sizeof(buf1), "%ld", ret );
 
-		//printf( "DBG: add ==> %s\n", buf1 );
+		//PP( "DBG: add ==> %s\n", buf1 );
 
 		if (res) *res = std::string( buf1 );
 	}
@@ -256,7 +266,7 @@ int micm_mul( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *
 
 		snprintf( buf1, sizeof(buf1), "%ld", ret );
 
-		//printf( "DBG: mul ==> %s\n", buf1 );
+		//PP( "DBG: mul ==> %s\n", buf1 );
 
 		if (res) *res = std::string( buf1 );
 	}
@@ -335,18 +345,21 @@ int mi_call_uproc( mirtc *parent_rtc, const std::vector<std::string>& cur_cmd, s
 	mirtc rtc;
 
 	rtc.parent_rtc = parent_rtc;
+	rtc.level = parent_rtc ? parent_rtc->level+1 : 1000;
 
 	mi_uproc *puproc = NULL;
 	mirtc *prtc = mi_find_proc_rtc( parent_rtc, cur_cmd[0], &puproc );
 	if (prtc)
 	{
+		PPR( &rtc, "XXX: puSh rtc %p <- %p\n", &rtc, parent_rtc );
+
 		unsigned i = 1;
 		for (auto I : puproc->args )
 		{
 			if (i >= cur_cmd.size())
 				break;
 
-			printf( "call_proc [%s]: local var: [%s] = [%s]\n",
+			PPR( &rtc, "call_proc [%s]: local var: [%s] = [%s]\n",
 					cur_cmd[0].c_str(), I.first.c_str(), cur_cmd[i].c_str() );
 
 			std::vector<std::string> var_cmd;
@@ -357,14 +370,12 @@ int mi_call_uproc( mirtc *parent_rtc, const std::vector<std::string>& cur_cmd, s
 			i++;
 		}
 
-		printf( "XXX: puSh rtc %p <- %p\n", &rtc, parent_rtc );
-
 		mi( &rtc, puproc->body );
-
-		printf( "XXX: pOp  rtc %p -> %p\n", &rtc, parent_rtc );
 
 		parent_rtc->side_effect = rtc.side_effect;
 		if (res) *res = rtc.side_effect;
+
+		PPR( &rtc, "XXX: pOp  rtc %p -> %p\n", &rtc, parent_rtc );
 	}
 	else
 	{
@@ -380,7 +391,7 @@ int mi_call( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *r
 	int i = 0;
 	for (auto x : cur_cmd)
 	{
-		printf( "%s %d: \"%s\"\n", i == 0 ? "eval: " : "      " , i, x.c_str() );
+		PP( "%s %d: \"%s\"\n", i == 0 ? "eval: " : "      " , i, x.c_str() );
 		i++;
 	}
 #endif
@@ -402,7 +413,7 @@ int mi_call( mirtc *rtc, const std::vector<std::string>& cur_cmd, std::string *r
 		return ret;
 	}
 
-	printf( "ERR: unk proc: [%s] (rtc == %p)\n", cur_cmd[0].c_str(), rtc );
+	PPR( rtc, "ERR: unk proc: [%s] (rtc == %p)\n", cur_cmd[0].c_str(), rtc );
 
 	assert( false );
 
@@ -422,12 +433,19 @@ static char decode_esc_char( char ch )
 	}
 }
 
+static std::string join_char_list( std::list<char>& chl )
+{
+	std::string ret;
+	for (auto ch : chl)
+		ret += ch;
+	return ret;
+}
+
 void mi( mirtc *parent_rtc, const std::string& e )
 {
 	size_t ii = 0;
 
-	//mirtc rtc;;
-	mirtc &rtc = *(new mirtc);
+	mirtc rtc;
 
 	int state = mis_normal;
 	std::list<int> state_stack;
@@ -440,8 +458,9 @@ void mi( mirtc *parent_rtc, const std::string& e )
 	std::list<char> sbrace_stack;
 
 	rtc.parent_rtc = parent_rtc;
+	rtc.level = parent_rtc ? parent_rtc->level+1 : 0;
 
-	printf( "XXX: push rtc %p <- %p\n", &rtc, parent_rtc );
+	PPR( &rtc, "XXX: push rtc %p <- %p\n", &rtc, parent_rtc );
 
 	while (ii <= e.size())
 	{
@@ -468,8 +487,8 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					// return is not a function. (for now?)
 					if (cur_cmd[0].compare( "return" ) == 0)
 					{
-						parent_rtc->side_effect = mi_val_join( cur_cmd, 1 );
-						printf( "DBG: return %s\n", parent_rtc->side_effect.c_str() );
+						rtc.side_effect = mi_val_join( cur_cmd, 1 );
+						PPR( &rtc, "DBG: return %s\n", rtc.side_effect.c_str() );
 						break;
 					}
 
@@ -477,6 +496,11 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					// if (ret == )
 
 					cur_cmd.clear();
+
+					std::string brs = join_char_list( brace_stack );
+					std::string sbrs = join_char_list( sbrace_stack );
+					PPR( &rtc, "YYY: res [%s] (%lu) [%s] [%s]\n", res.c_str(),
+						(long unsigned)cmd_stack.size(), brs.c_str(), sbrs.c_str());
 
 					if (not(cmd_stack.empty()) and not(brace_stack.empty()) and brace_stack.back() == ch )
 					{
@@ -489,7 +513,8 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					}
 					else
 					{
-						//cur_str = res;
+						//PPR( &rtc, "ZZZ: losing to side_effect [%s]\n", res.c_str() );
+						// in case of call like `mi("add 1 2")`, the side-effect is the result
 						rtc.side_effect = res;
 					}
 				}
@@ -639,7 +664,7 @@ void mi( mirtc *parent_rtc, const std::string& e )
 				if (!vrtc)
 					pval = &val;
 
-				printf( "DBG: $ var name: [%s] == [%s]\n", cur_str.c_str(), pval->c_str() );
+				PPR( &rtc, "DBG: $ var name: [%s] == [%s]\n", cur_str.c_str(), pval->c_str() );
 
 				cur_cmd.push_back( *pval );
 				cur_str.clear();
@@ -657,7 +682,11 @@ void mi( mirtc *parent_rtc, const std::string& e )
 		}
 	}
 
-	printf( "XXX: pop  rtc %p -> %p\n", &rtc, parent_rtc );
+	// in case of call like `mi("add 1 2")`, the side-effect is the result
+	if (parent_rtc)
+		parent_rtc->side_effect = rtc.side_effect;
+
+	PPR( &rtc, "XXX: pop  rtc %p -> %p\n", &rtc, parent_rtc );
 }
 
 void test1()
@@ -683,27 +712,28 @@ void test1()
 	printf( "-------------------------------\n" );
 	*/
 
+#if 0
 	const char *x11 = "proc a { return (b) }; proc b { return (add 1 1) }; println (a);";
 	mi( NULL, std::string( x11 ) );
+#endif
 
-	/*
+#if 1
 	const char *x2 =
 		"proc fact n {"					"\n"
 		"	if (eq $n 0) {"				"\n"
 		"		return 1"			"\n"
 		"	} else {"				"\n"
-		"		var m (fact (add $n -1))"	"\n"
+		"		var m1 (add $n -1)"		"\n"
+		"		var m (fact $m1)"		"\n"
 		"		return (mul $n $m)"		"\n"
 		"	}"					"\n"
 		"}"						"\n"
-		"println (fact 5)"				"\n"
-		"println (mul 2 2)"				"\n"
+		"println (fact 6)"				"\n"
+		"println (mul 1 2 3 4 5 6)"			"\n"
 		;
 	printf( "raw: [[[\n%s]]]\n", x2 );
 	mi( NULL, std::string( x2 ) );
-	*/
-
-
+#endif
 }
 
 int main()
