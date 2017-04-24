@@ -1,10 +1,13 @@
 
 #include <cstdio>
 #include <cassert>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <list>
 #include <map>
+#include <fstream>
+#include <streambuf>
 
 typedef std::vector<std::string> str_list_t;
 
@@ -736,10 +739,62 @@ void test1()
 #endif
 }
 
+#if defined(SELF_TEST)
 int main()
 {
 	test1();
 	return 0;
 }
+#elif defined(MISH)
+int main(int argc, char **argv)
+{
+	if (argc >= 3 && strcmp(argv[1], "-c") == 0)
+	{
+		mirtc rtc;
+		rtc.level = 1;
+		rtc.parent_rtc = NULL;
+		for (int i = 2; i<argc; i++)
+		{
+			mi( &rtc, std::string(argv[i]) );
+		}
+		return 0;
+	}
+	else if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
+	{
+		printf( "mish -c" );
+		return 0;
+	}
+	else if (argc >= 2)
+	{
+		mirtc rtc;
+		rtc.level = 1;
+		rtc.parent_rtc = NULL;
+
+		int ret = 0;
+
+		for (int i = 1; i<argc; i++)
+		{
+
+			std::ifstream t(argv[i]);
+			if (t)
+			{
+				std::string str
+					(
+						(std::istreambuf_iterator<char>(t)),
+						std::istreambuf_iterator<char>()
+					);
+
+				mi( &rtc, str );
+			}
+			else
+			{
+				printf( "ERR: can't open file: %s\n", argv[i] );
+				ret = 1;
+			}
+		}
+	}
+	return 1;
+}
+#endif
 
 // vim:cindent:
