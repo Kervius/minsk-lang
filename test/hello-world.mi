@@ -1,0 +1,3 @@
+print "hello world\n"
+println "hello world"
+println {hello world}

@@ -47,6 +47,8 @@ struct mirtc {
 	var_table_t var_table;
 
 	std::string side_effect;
+
+	mirtc() : level(0), parent_rtc(NULL) {};
 };
 
 static char decode_esc_char( char ch );
@@ -67,8 +69,11 @@ typedef int (*mi_command_t)( mirtc *rtc, const std::vector<std::string>& cur_cmd
 
 mirtc *mi_find_var_rtc( mirtc *rtc, const std::string& var_name, std::string **ppval )
 {
+	int count = 32*1024;
+	(void)count;
 	//mirtc *srtc = rtc;
 	while (rtc) {
+		assert( --count > 0 );
 		auto x = rtc->var_table.find( var_name );
 		if (x != rtc->var_table.end()) {
 			if (ppval) *ppval = &(x->second);
@@ -347,6 +352,8 @@ int mi_call_uproc( mirtc *parent_rtc, const std::vector<std::string>& cur_cmd, s
 {
 	mirtc rtc;
 
+	assert( parent_rtc != NULL );
+
 	rtc.parent_rtc = parent_rtc;
 	rtc.level = parent_rtc ? parent_rtc->level+1 : 1000;
 
@@ -448,7 +455,9 @@ void mi( mirtc *parent_rtc, const std::string& e )
 {
 	size_t ii = 0;
 
-	mirtc rtc;
+	assert( parent_rtc != NULL );
+
+	mirtc &rtc = *parent_rtc;
 
 	int state = mis_normal;
 	std::list<int> state_stack;
@@ -459,9 +468,6 @@ void mi( mirtc *parent_rtc, const std::string& e )
 
 	std::list<char> brace_stack;
 	std::list<char> sbrace_stack;
-
-	rtc.parent_rtc = parent_rtc;
-	rtc.level = parent_rtc ? parent_rtc->level+1 : 0;
 
 	PPR( &rtc, "XXX: push rtc %p <- %p\n", &rtc, parent_rtc );
 
@@ -496,7 +502,7 @@ void mi( mirtc *parent_rtc, const std::string& e )
 					}
 
 					ret = mi_call( &rtc, cur_cmd, &res );
-					// if (ret == )
+					(void)ret;// if (ret == )
 
 					cur_cmd.clear();
 
@@ -694,48 +700,76 @@ void mi( mirtc *parent_rtc, const std::string& e )
 
 void test1()
 {
-	/*
-	const char *x1 = 
-		"switch (a 1 2) {\n"
-		"case \"a\" { print $a }\n"
-		"case \"b\" { print $b }\n"
-		"case \"c\" { print $c }\n"
-		"}\n"
-		;
-	printf( "raw: [[[\n%s]]]\n", x1 );
-	mi( NULL, std::string( x1 ) );
-	printf( "-------------------------------\n" );
-	mi( NULL, std::string("let a \"string test\"") );
-	printf( "-------------------------------\n" );
-	mi( NULL, std::string("let a (add (mul 2 2) (mul 3 (add 1 1)))") );
-	printf( "-------------------------------\n" );
-	mi( NULL, std::string("if $a {curly test {test} test} else { not wrong too }") );
-	printf( "-------------------------------\n" );
-	mi( NULL, std::string("proc fact n { let a (fact (add n )) }") );
-	printf( "-------------------------------\n" );
-	*/
+#if 0
+	if (1)
+	{
+		const char *x1 = 
+			"switch (a 1 2) {\n"
+			"case \"a\" { print $a }\n"
+			"case \"b\" { print $b }\n"
+			"case \"c\" { print $c }\n"
+			"}\n"
+			;
+		printf( "-------------------------------\n" );
+		printf( "raw: [[[\n%s]]]\n", x1 );
+		mirtc rtc;
+		mi( &rtc, std::string( x1 ) );
+	}
+	if (1)
+	{
+		printf( "-------------------------------\n" );
+		mirtc rtc;
+		mi( &rtc, std::string("let a \"string test\"") );
+	}
+	if (1)
+	{
+		printf( "-------------------------------\n" );
+		mirtc rtc;
+		mi( &rtc, std::string("let a (add (mul 2 2) (mul 3 (add 1 1)))") );
+	}
+	if (1)
+	{
+		printf( "-------------------------------\n" );
+		mirtc rtc;
+		mi( &rtc, std::string("if $a {curly test {test} test} else { not wrong too }") );
+	}
+	if (1)
+	{
+		printf( "-------------------------------\n" );
+		mirtc rtc;
+		mi( &rtc, std::string("proc fact n { let a (fact (add n )) }") );
+	}
+#endif
 
 #if 0
-	const char *x11 = "proc a { return (b) }; proc b { return (add 1 1) }; println (a);";
-	mi( NULL, std::string( x11 ) );
+	if (1)
+	{
+		const char *x11 = "proc a { return (b) }; proc b { return (add 1 1) }; println (a);";
+		mirtc rtc;
+		mi( &rtc, std::string( x11 ) );
+	}
 #endif
 
 #if 1
-	const char *x2 =
-		"proc fact n {"					"\n"
-		"	if (eq $n 0) {"				"\n"
-		"		return 1"			"\n"
-		"	} else {"				"\n"
-		"		var m1 (add $n -1)"		"\n"
-		"		var m (fact $m1)"		"\n"
-		"		return (mul $n $m)"		"\n"
-		"	}"					"\n"
-		"}"						"\n"
-		"println (fact 6)"				"\n"
-		"println (mul 1 2 3 4 5 6)"			"\n"
-		;
-	printf( "raw: [[[\n%s]]]\n", x2 );
-	mi( NULL, std::string( x2 ) );
+	if (1)
+	{
+		const char *x2 =
+			"proc fact n {"					"\n"
+			"	if (eq $n 0) {"				"\n"
+			"		return 1"			"\n"
+			"	} else {"				"\n"
+			"		var m1 (add $n -1)"		"\n"
+			"		var m (fact $m1)"		"\n"
+			"		return (mul $n $m)"		"\n"
+			"	}"					"\n"
+			"}"						"\n"
+			"println fact 6 = (fact 6)"				"\n"
+			"println fact 6 = (mul 1 2 3 4 5 6)"			"\n"
+			;
+		printf( "raw: [[[\n%s]]]\n", x2 );
+		mirtc rtc;
+		mi( &rtc, std::string( x2 ) );
+	}
 #endif
 }
 
@@ -775,8 +809,9 @@ int main(int argc, char **argv)
 		for (int i = 1; i<argc; i++)
 		{
 
-			std::ifstream t(argv[i]);
-			if (t)
+			std::ifstream t;
+			t.open(argv[i], std::ios::in);
+			if (t.is_open())
 			{
 				std::string str
 					(
@@ -792,6 +827,7 @@ int main(int argc, char **argv)
 				ret = 1;
 			}
 		}
+		return ret;
 	}
 	return 1;
 }
