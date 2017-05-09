@@ -15,10 +15,11 @@ typedef std::list< str_list_t > str_list_stack_t;
 
 enum {
 	mis_normal = 0,
-	mis_string = 1,
-	mis_string_esc = 2,
-	mis_vstring    = 3,
-	mis_variable   = 4,
+	mis_escape = 1,
+	mis_string = 2,
+	mis_string_esc = 3,
+	mis_vstring    = 4,
+	mis_variable   = 5,
 };
 
 enum {
@@ -473,14 +474,16 @@ void mi( mirtc *parent_rtc, const std::string& e )
 
 	while (ii <= e.size())
 	{
-		int ch = ii < e.size() ? e[ii] : -1;
-		ii++;
+		int ch;
+		do {
+			ch = ii < e.size() ? e[ii] : -1;
+			ii++;
+		} while (ch == '\r');
 
 		//printf( "state: %d, char %c (%d)\n", state, isprint(ch) ? ch : '.', ch );
 
 		if (state == mis_normal)
 		{
-			//if (ch == '\\') { } else
 			if (ch == -1 || ch == ';' || ch == '\n' || (not(brace_stack.empty()) and brace_stack.back() == ch))
 			{
 				if (not cur_str.empty())
@@ -582,10 +585,33 @@ void mi( mirtc *parent_rtc, const std::string& e )
 				state_stack.push_back( state );
 				state = mis_variable;
 			}
+			else if (ch == '\\')
+			{
+				state_stack.push_back( state );
+				state = mis_escape;
+			}
 			else
 			{
 				cur_str.push_back( ch );
 			}
+		}
+		else if (state == mis_escape)
+		{
+			//assert( false && "support for '\\' missing" );
+			if (ch == '\n')
+			{
+				if (not cur_str.empty())
+				{
+					cur_cmd.push_back( cur_str );
+					cur_str.clear();
+				}
+			}
+			else
+			{
+				cur_str.push_back( ch );
+			}
+			state = state_stack.back();
+			state_stack.pop_back();
 		}
 		else if (state == mis_string)
 		{
