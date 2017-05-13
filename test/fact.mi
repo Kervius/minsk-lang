@@ -1,0 +1,12 @@
+proc fact n {
+	if (eq $n 0) {
+		return 1
+	} else {
+		var m1 (add $n -1)
+		var m (fact $m1)
+		return (mul $n $m)
+	}
+}
+println (fact 6)
+println (mul 1 2 3 4 5 6)
+
