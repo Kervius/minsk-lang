@@ -30,3 +30,4 @@ TODO
 * [ ] object and object-orientation
 * [ ] containers (possibly based on OO; basic array can be implemented already using the string splices)
 * [ ] a basic type checking system
+* [ ] if anything interesting comes out of it, make a small embeddable implementation in C, targeted at very small systems (goal: code+heap usage under 10KB).
