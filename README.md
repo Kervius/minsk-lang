@@ -2,7 +2,7 @@
 Minimalistic Scripting Language
 
 Purpose
--------
+=======
 
 It is a barebone implementation of a primitive dynamic interpreted langauge, inteded as a testbed for ideas.
 
@@ -13,7 +13,7 @@ To keep it simple, it borrows the most basic syntax features from Tcl, Lisp and 
 In the current state, the standard library contains only the functions required to implement the factorial example.
 
 Example - Factorial
--------------------
+===================
 
 	proc fact n {
 		if (eq $n 0) {
@@ -25,8 +25,16 @@ Example - Factorial
 	}
 	println (fact 6)
 
-TODO
+How to run it
 ----
+Factorial implementation is kept as one of the tests:
+
+	make mish
+	./mish test/fact.mi
+
+TODO
+====
+* [ ] error handling (exceptions)
 * [ ] object and object-orientation
 * [ ] containers (possibly based on OO; basic array can be implemented already using the string splices)
 * [ ] a basic type checking system
